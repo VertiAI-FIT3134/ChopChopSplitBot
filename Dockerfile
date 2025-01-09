@@ -12,9 +12,14 @@ ENV NODE_ENV=$NODE_ENV
 
 COPY . .
 
-RUN npm ci
+# Install dependencies including devDependencies
+RUN npm ci --include=dev
 
+# Build the application
 RUN npm run build
+
+# Clean up dev dependencies
+RUN npm ci --omit=dev
 
 EXPOSE 3000
 
