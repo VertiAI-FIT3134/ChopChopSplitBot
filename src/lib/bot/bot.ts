@@ -6,33 +6,61 @@ import { formatUser, memberToList, pmd2 } from "./utils";
 import { GeminiImageProcessor } from "../../../services/gemini-processor";
 import { downloadTelegramFile } from "../utils/telegram-utils";
 
-const BOT_TOKEN = env.BOT_TOKEN;
-const BASE_HOST = env.APP_HOST;
+// Lazy loaded instances
+let botInstance: TelegramBot | null = null;
+let baseHostValue: string | null = null;
+let botTokenValue: string | null = null;
 
-if (!BOT_TOKEN) throw new Error("BOT_TOKEN is not set");
-if (!BASE_HOST) throw new Error("BASE_HOST is not set");
+// Getter for bot token
+function getBotToken() {
+  if (!botTokenValue) {
+    const token = env.BOT_TOKEN;
+    if (!token) throw new Error("BOT_TOKEN is not set");
+    botTokenValue = token;
+  }
+  return botTokenValue;
+}
 
-export const bot = new TelegramBot(BOT_TOKEN);
+// Getter for base host
+function getBaseHost() {
+  if (!baseHostValue) {
+    const host = env.APP_HOST;
+    if (!host) throw new Error("APP_HOST is not set");
+    baseHostValue = host;
+  }
+  return baseHostValue;
+}
+
+// Getter for bot instance
+function getBot() {
+  if (!botInstance) {
+    botInstance = new TelegramBot(getBotToken());
+  }
+  return botInstance;
+}
 
 // Initialize Gemini processor
 const geminiProcessor = new GeminiImageProcessor();
 
 export const setWebhook = async () => {
-  const webhookUrl = `${BASE_HOST}/bot`;
+  const webhookUrl = `${getBaseHost()}/bot`;
   console.log("Setting webhook to:", webhookUrl);
-  const result = await bot.setWebHook(webhookUrl);
+  const result = await getBot().setWebHook(webhookUrl);
   console.log("Webhook set result:", result);
   return result;
 };
 
+// Export bot for compatibility with existing code
+export const bot = getBot();
+
 function sendPrivateMessage(chatId: number, languageCode: string | undefined) {
-  bot.sendMessage(chatId, translate(languageCode, "bot.add_to_group"), {
+  getBot().sendMessage(chatId, translate(languageCode, "bot.add_to_group"), {
     parse_mode: "MarkdownV2",
     reply_markup: {
       inline_keyboard: [
-        [{ text: translate(languageCode, "bot.list_transactions"), web_app: { url: BASE_HOST + "/webapp/list" } }],
-        [{ text: translate(languageCode, "bot.add_split"), web_app: { url: BASE_HOST + "/webapp/add-split" } }],
-        [{ text: translate(languageCode, "bot.add_payment"), web_app: { url: BASE_HOST + "/webapp/add-payment" } }],
+        [{ text: translate(languageCode, "bot.list_transactions"), web_app: { url: getBaseHost() + "/webapp/list" } }],
+        [{ text: translate(languageCode, "bot.add_split"), web_app: { url: getBaseHost() + "/webapp/add-split" } }],
+        [{ text: translate(languageCode, "bot.add_payment"), web_app: { url: getBaseHost() + "/webapp/add-payment" } }],
         [{ text: translate(languageCode, "bot.start_trial"), url: `https://chopchopsplit.com/#pricing?user_id=${chatId}` }],
       ],
     },
@@ -41,7 +69,7 @@ function sendPrivateMessage(chatId: number, languageCode: string | undefined) {
 
 const sendError = (chatId: TelegramBot.ChatId, languageCode: string | undefined, error: any) => {
   console.log(error);
-  bot.sendMessage(chatId, translate(languageCode, "bot.error"));
+  getBot().sendMessage(chatId, translate(languageCode, "bot.error"));
 };
 
 const ADD_USER_KEYBOARD = (languageCode: string | undefined) =>
@@ -170,7 +198,7 @@ bot.on("callback_query", async (query) => {
       const taxesIncluded = Math.abs(total - subtotal) < 0.01;
 
       // Create URL with processed items and tax information
-      const webAppUrl = `${BASE_HOST}/webapp/add-split?amount=${amount}&description=${encodeURIComponent(description)}&receiptItems=${encodeURIComponent(JSON.stringify(items))}&serviceCharge=${serviceCharge}&serviceTax=${serviceTax}&taxesIncluded=${taxesIncluded}`;
+      const webAppUrl = `${getBaseHost()}/webapp/add-split?amount=${amount}&description=${encodeURIComponent(description)}&receiptItems=${encodeURIComponent(JSON.stringify(items))}&serviceCharge=${serviceCharge}&serviceTax=${serviceTax}&taxesIncluded=${taxesIncluded}`;
 
       console.log("Web app URL:", webAppUrl);
 

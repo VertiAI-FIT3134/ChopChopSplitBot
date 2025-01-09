@@ -2,13 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Add build arguments
-ARG MONGO_URI
-ARG NODE_ENV=production
-
-# Set environment variables for build time
-ENV MONGO_URI=$MONGO_URI
-ENV NODE_ENV=$NODE_ENV
+# Only keep NODE_ENV for build optimization
+# All other environment variables will be loaded dynamically at runtime
+ENV NODE_ENV=production
 
 COPY . .
 
@@ -16,6 +12,7 @@ COPY . .
 RUN npm ci --include=dev
 
 # Build the application
+# No environment variables needed at build time due to lazy loading
 RUN npm run build
 
 # Clean up dev dependencies
@@ -23,7 +20,7 @@ RUN npm ci --omit=dev
 
 EXPOSE 3000
 
-# Set runtime environment variables
-ENV NODE_ENV=production
-
-CMD [ "node", "-r", "dotenv/config", "build" ]
+# Runtime command that uses Node's native environment loading
+# This allows SvelteKit's $env/dynamic/private to work properly
+# Environment variables like BOT_TOKEN and APP_HOST will be loaded on-demand
+CMD ["node", "build"]
