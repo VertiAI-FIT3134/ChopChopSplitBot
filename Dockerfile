@@ -31,5 +31,5 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 
-# Run the built application using the SvelteKit server output
-CMD [ "node", "-r", "dotenv/config", ".svelte-kit/output/server/index.js" ]
+# Run the built application using the Node adapter output
+CMD ["node", "build"]
