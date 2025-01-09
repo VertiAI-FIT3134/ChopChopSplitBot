@@ -2,28 +2,33 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Add build arguments
-ARG MONGO_URI
-ARG NODE_ENV=production
-
-# Set environment variables for build time
-ENV MONGO_URI=$MONGO_URI
-ENV NODE_ENV=$NODE_ENV
-
 COPY . .
 
-# Install dependencies including devDependencies
-RUN npm ci --include=dev
+# Add build-time environment variables
+ARG MONGO_URI
+ENV MONGO_URI=${MONGO_URI}
 
-# Build the application
+ARG BOT_TOKEN
+ENV BOT_TOKEN=${BOT_TOKEN}
+
+ARG APP_HOST
+ENV APP_HOST=${APP_HOST}
+
+ARG APP_PORT
+ENV APP_PORT=${APP_PORT}
+
+ARG GEMINI_API_KEY
+ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+
+ARG STRIPE_SECRET_KEY
+ENV STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+
+RUN npm ci
+
 RUN npm run build
-
-# Clean up dev dependencies
-RUN npm ci --omit=dev
 
 EXPOSE 3000
 
-# Set runtime environment variables
 ENV NODE_ENV=production
 
 CMD [ "node", "-r", "dotenv/config", "build" ]
