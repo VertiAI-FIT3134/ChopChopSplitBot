@@ -12,7 +12,6 @@
 	},
 	"devDependencies": {
 		"@iconify/svelte": "^3.1.4",
-		"@sveltejs/adapter-vercel": "^3.1.0",
 		"@sveltejs/kit": "^1.20.4",
 		"@types/node-telegram-bot-api": "^0.61.7",
 		"@typescript-eslint/eslint-plugin": "^5.45.0",
@@ -33,6 +32,7 @@
 	"type": "module",
 	"dependencies": {
 		"@google/generative-ai": "^0.21.0",
+		"@sveltejs/adapter-auto": "^3.3.1",
 		"dotenv": "^16.3.1",
 		"node-fetch": "^3.3.2",
 		"node-telegram-bot-api": "^0.61.0"
