@@ -1,6 +1,17 @@
 import type TelegramBot from "node-telegram-bot-api";
 import db from "./db";
 import { ObjectId } from "mongodb";
+import { translate } from "../i18n/i18n";
+
+interface CachedPlan {
+  hasPlan: boolean;
+  plan?: Plan;
+  cachedAt: number;
+}
+
+// Cache for plan status - stores userId -> plan data
+const planCache = new Map<number, CachedPlan>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 export const registerGroup = async (chat: TelegramBot.Chat) => {
   await db.collection("groups").createIndex("id", { unique: true });
@@ -438,4 +449,258 @@ export const simplifyTransactions = async (group: Group, splits: TransactionData
   });
 
   return finalGraph.sort((a, b) => a.first_name.localeCompare(b.first_name));
+};
+
+// Plan types and interfaces
+export type PlanType = 'weekend' | 'vacation' | 'extended';
+
+export interface Plan {
+  type: PlanType;
+  started_at: Date;
+  expires_at: Date;
+}
+
+// Plan limits
+export const PLAN_LIMITS = {
+  weekend: {
+    maxTravelers: 4,
+    maxScans: 50,
+    maxDays: 3,
+    maxTrips: 1
+  },
+  vacation: {
+    maxTravelers: 8,
+    maxScans: 200,
+    maxDays: 7,
+    maxTrips: 2
+  },
+  extended: {
+    maxTravelers: 15,
+    maxScans: Infinity,
+    maxDays: 14,
+    maxTrips: 5
+  }
+} as const;
+
+// Check user's plan status with caching
+export const checkUserPlan = async (userId: number): Promise<{ hasPlan: boolean; plan?: Plan }> => {
+  const now = new Date();
+  const cached = planCache.get(userId);
+
+  // Check if we have a valid cached result
+  if (cached && (now.getTime() - cached.cachedAt) < CACHE_TTL) {
+    console.log("Using cached plan data for user:", userId);
+    return { hasPlan: cached.hasPlan, plan: cached.plan };
+  }
+
+  console.log("Checking plan in database for user:", userId);
+  
+  // Query database for fresh data
+  const user = await db.collection("users").findOne({
+    id: userId,
+    'plan.expires_at': { $gt: now }
+  });
+  
+  console.log("User data from MongoDB:", JSON.stringify(user, null, 2));
+  
+  let result: { hasPlan: boolean; plan?: Plan };
+  
+  if (!user?.plan) {
+    console.log("No active plan found for user");
+    result = { hasPlan: false };
+  } else {
+    // Parse the plan data
+    const plan = {
+      type: user.plan.type as PlanType,
+      started_at: new Date(user.plan.started_at),
+      expires_at: new Date(user.plan.expires_at)
+    };
+
+    console.log("Active plan found:", {
+      type: plan.type,
+      started_at: plan.started_at.toISOString(),
+      expires_at: plan.expires_at.toISOString()
+    });
+    
+    result = { hasPlan: true, plan };
+  }
+
+  // Cache the result
+  planCache.set(userId, {
+    ...result,
+    cachedAt: now.getTime()
+  });
+
+  return result;
+};
+
+// Add function to invalidate cache when plan changes
+export const invalidatePlanCache = (userId: number) => {
+  console.log("Invalidating plan cache for user:", userId);
+  planCache.delete(userId);
+};
+
+// Get user's remaining limits
+export const getUserPlanLimits = async (userId: number) => {
+  console.log("Getting plan limits for user:", userId);
+  const { hasPlan, plan } = await checkUserPlan(userId);
+  
+  if (!hasPlan || !plan) {
+    console.log("No active plan found for limits");
+    return null;
+  }
+
+  const limits = PLAN_LIMITS[plan.type];
+  
+  // Get usage stats from the database
+  const stats = await db.collection("usage_stats").findOne({ userId });
+  console.log("Usage stats from MongoDB:", stats);
+
+  const defaultStats = {
+    scans: 0,
+    trips: 0,
+    travelers: 0
+  };
+
+  const currentStats = stats || defaultStats;
+  console.log("Current stats:", currentStats);
+
+  return {
+    scansRemaining: limits.maxScans === Infinity ? Infinity : limits.maxScans - (currentStats.scans || 0),
+    tripsRemaining: limits.maxTrips - (currentStats.trips || 0),
+    travelersRemaining: limits.maxTravelers - (currentStats.travelers || 0),
+    daysRemaining: Math.ceil((plan.expires_at.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+  };
+};
+
+// Update usage stats
+export const updateUsageStats = async (userId: number, updates: { scans?: number; trips?: number; travelers?: number }) => {
+  console.log("Updating usage stats for user:", userId, "Updates:", updates);
+  const result = await db.collection("usage_stats").updateOne(
+    { userId },
+    {
+      $inc: {
+        scans: updates.scans || 0,
+        trips: updates.trips || 0,
+        travelers: updates.travelers || 0
+      }
+    },
+    { upsert: true }
+  );
+  console.log("Usage stats update result:", result);
+  return result;
+};
+
+// Check if user has access to a premium feature
+export const checkPremiumAccess = async (userId: number, feature: 'scan' | 'trip' | 'travelers'): Promise<boolean> => {
+  console.log(`Checking premium access for user ${userId}, feature: ${feature}`);
+  const { hasPlan, plan } = await checkUserPlan(userId);
+  
+  if (!hasPlan || !plan) {
+    console.log('No active plan found');
+    return false;
+  }
+
+  const limits = await getUserPlanLimits(userId);
+  if (!limits) {
+    console.log('Failed to get plan limits');
+    return false;
+  }
+
+  let hasAccess = false;
+  switch (feature) {
+    case 'scan':
+      hasAccess = limits.scansRemaining > 0;
+      break;
+    case 'trip':
+      hasAccess = limits.tripsRemaining > 0;
+      break;
+    case 'travelers':
+      hasAccess = limits.travelersRemaining > 0;
+      break;
+  }
+
+  console.log(`Access result for ${feature}: ${hasAccess}`);
+  return hasAccess;
+};
+
+// Update or set user's plan
+export const updateUserPlan = async (userId: number, planType: PlanType): Promise<{ success: boolean; message?: string }> => {
+  console.log(`Updating plan for user ${userId} to ${planType}`);
+  
+  try {
+    const { hasPlan, plan } = await checkUserPlan(userId);
+    const now = new Date();
+    let startDate = now;
+    
+    if (hasPlan && plan && plan.expires_at > now) {
+      startDate = plan.expires_at;
+    }
+
+    const daysToAdd = PLAN_LIMITS[planType].maxDays;
+    const expiryDate = new Date(startDate);
+    expiryDate.setDate(expiryDate.getDate() + daysToAdd);
+
+    const result = await db.collection("users").updateOne(
+      { id: userId },
+      {
+        $set: {
+          plan: {
+            type: planType,
+            started_at: startDate,
+            expires_at: expiryDate
+          }
+        }
+      }
+    );
+
+    console.log('Plan update result:', result);
+
+    if (result.matchedCount === 0) {
+      return { success: false, message: "User not found" };
+    }
+
+    // Reset usage stats
+    await db.collection("usage_stats").updateOne(
+      { userId },
+      {
+        $set: {
+          scans: 0,
+          trips: 0,
+          travelers: 0
+        }
+      },
+      { upsert: true }
+    );
+
+    // Invalidate cache after update
+    invalidatePlanCache(userId);
+
+    return { 
+      success: true,
+      message: hasPlan ? "Plan upgraded" : "Plan activated"
+    };
+  } catch (error) {
+    console.error('Error updating plan:', error);
+    return { success: false, message: "Failed to update plan" };
+  }
+};
+
+// Send expiration message
+export const sendExpirationMessage = async (bot: any, userId: number, planType: string, isExpired: boolean = false) => {
+  const message = isExpired ? 
+    translate("default", "bot.plan_expired", { planType }) :
+    translate("default", "bot.plan_expiring_soon", { planType });
+
+  await bot.sendMessage(userId, message, {
+    parse_mode: "MarkdownV2",
+    reply_markup: {
+      inline_keyboard: [
+        [{
+          text: translate("default", "bot.get_premium"),
+          url: `https://chopchopsplit.com/#pricing?user_id=${userId}`
+        }]
+      ]
+    }
+  });
 };

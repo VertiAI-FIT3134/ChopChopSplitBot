@@ -1,9 +1,7 @@
-import { env } from "$env/dynamic/private";
 import { MongoClient } from "mongodb";
-
-if (!env.MONGO_URI) throw Error("MONGO_URI not defined.");
+import { env } from "$env/dynamic/private";
 
 const client = new MongoClient(env.MONGO_URI);
-await client.connect();
+const db = client.db("splitgram");
 
-export default client.db("chopchopsplit");
+export default db;
