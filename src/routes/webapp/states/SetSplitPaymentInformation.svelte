@@ -94,7 +94,7 @@
 <div class="flex flex-col gap-3">
   {#if receiptItems}
     <p class="hint">{$_("app.receipt_items")}</p>
-    <div class="bg-black p-3 rounded-lg">
+    <div class="bg-second p-3 rounded-lg">
       {#each receiptItems as item}
         <div class="w-full flex justify-between py-2 border-b border-gray-200 last:border-0">
           <div>
