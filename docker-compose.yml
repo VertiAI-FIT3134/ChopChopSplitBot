@@ -5,6 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - MONGO_URI
+        - BOT_TOKEN
+        - APP_HOST
+        - APP_PORT
+        - GEMINI_API_KEY
     user: "node"
     environment:
       - NODE_ENV=production
