@@ -55,8 +55,13 @@ function getBot() {
 // Initialize Gemini processor
 const geminiProcessor = new GeminiImageProcessor();
 
-// Add at the top with other state variables
-const awaitingReceipt = new Set<number>();
+// Store awaiting receipt users in a more persistent way
+const state = {
+  awaitingReceipt: new Set<number>()
+};
+
+// Export for testing/debugging
+export const getState = () => state;
 
 export const setWebhook = async () => {
   const webhookUrl = `${getBaseHost()}/bot`;
@@ -275,7 +280,7 @@ bot.on("callback_query", async (callbackQuery) => {
       } else if (data === "receipt") {
         // Handle receipt button click
         console.log(`Adding user ${user.id} to awaiting receipt`);
-        awaitingReceipt.add(user.id);
+        state.awaitingReceipt.add(user.id);
         
         await bot.sendMessage(
           message.chat.id,
@@ -495,8 +500,8 @@ async function sendSplitExpenses(user: TelegramBot.User | undefined, message: Te
   }
 }
 
-// Update split command handler
-bot.onText(/\/split/, async (message) => {
+// Update command handler to use /chop
+bot.onText(/\/chop/, async (message) => {
   const userId = message.from?.id;
   if (!userId) return;
 
@@ -509,7 +514,14 @@ bot.onText(/\/split/, async (message) => {
 
 // Update receipt command handler
 bot.onText(/\/receipt/, async (message) => {
-  console.log("Receipt command received");
+  console.log("Receipt command received", {
+    messageId: message.message_id,
+    chatId: message.chat.id,
+    chatType: message.chat.type,
+    userId: message.from?.id,
+    awaitingReceiptSize: state.awaitingReceipt.size,
+    awaitingReceiptUsers: Array.from(state.awaitingReceipt)
+  });
   
   if (!message.from?.id) {
     console.log("No user ID found");
@@ -517,16 +529,18 @@ bot.onText(/\/receipt/, async (message) => {
   }
 
   if (message.chat.type === "private") {
-    console.log("Private chat detected");
+    console.log("Private chat detected, ignoring");
     return;
   }
 
   if (!await checkPremiumAndNotify(message.from.id, message.chat.id, message.from.language_code)) {
+    console.log("User doesn't have premium access");
     return;
   }
 
-  console.log(`Adding user ${message.from.id} to awaiting receipt`);
-  awaitingReceipt.add(message.from.id);
+  console.log(`Adding user ${message.from.id} to awaiting receipt set`);
+  state.awaitingReceipt.add(message.from.id);
+  console.log("Updated awaiting receipt set:", Array.from(state.awaitingReceipt));
   
   await bot.sendMessage(
     message.chat.id,
@@ -536,19 +550,30 @@ bot.onText(/\/receipt/, async (message) => {
 });
 
 bot.on("photo", async (message) => {
-  console.log("Photo received");
-  console.log("From user:", message.from?.id);
-  console.log("Awaiting receipt users:", Array.from(awaitingReceipt));
+  console.log("Photo received", {
+    messageId: message.message_id,
+    chatId: message.chat.id,
+    chatType: message.chat.type,
+    userId: message.from?.id,
+    awaitingReceiptSize: state.awaitingReceipt.size,
+    awaitingReceiptUsers: Array.from(state.awaitingReceipt),
+    hasPhoto: !!message.photo,
+    photoSizes: message.photo?.length
+  });
 
   if (!message.from?.id) {
     console.log("No user ID in photo message");
     return;
   }
 
-  if (!awaitingReceipt.has(message.from.id)) {
-    console.log("User not awaiting receipt");
+  if (!state.awaitingReceipt.has(message.from.id)) {
+    console.log("User not awaiting receipt. Current awaiting users:", Array.from(state.awaitingReceipt));
     return;
   }
+
+  console.log("User found in awaiting receipt set, proceeding with processing");
+  state.awaitingReceipt.delete(message.from.id);
+  console.log("Updated awaiting receipt set after removal:", Array.from(state.awaitingReceipt));
 
   // Check premium access for receipt scanning
   const hasAccess = await checkPremiumAccess(message.from.id, 'scan');
@@ -573,7 +598,7 @@ bot.on("photo", async (message) => {
   }
 
   console.log("Processing receipt for user");
-  awaitingReceipt.delete(message.from.id);
+  state.awaitingReceipt.delete(message.from.id);
 
   if (!message.photo?.length) return;
   
