@@ -94,16 +94,15 @@
     <!-- Items List -->
     <div class="flex flex-col gap-3">
       {#each items as item, itemIndex}
-        <div class="bg-black p-3 rounded-lg border border-white/20">
-
-        <div class="font-bold">{item.name}</div>
+        <div class="bg-second p-3 rounded-lg border border-white/20">
+          <div class="font-bold">{item.name}</div>
           <div class="flex justify-between items-center">
-            <div class="text-md text-gray-300">
-             {item.quantity}x {item.unitPrice.toFixed(2)} = RM{item.totalPrice.toFixed(2)}
-             {#if item.charges}
-               <span class="text-gray-400"> (+{item.charges.toFixed(2)} tax)</span>
-             {/if}
-          </div>
+            <div class="text-md">
+              {item.quantity}x {item.unitPrice.toFixed(2)} = RM{item.totalPrice.toFixed(2)}
+              {#if item.charges}
+                <span class="text-gray-400"> (+{item.charges.toFixed(2)} tax)</span>
+              {/if}
+            </div>
 
             <button 
             class="text-md text-white px-3 py-2 rounded transition-all duration-200 hover:bg-gray-700 hover:scale-105"
@@ -143,7 +142,7 @@
       {/each}
 
       <!-- Service Charges Summary -->
-      <div class="bg-black p-3 rounded-lg border border-white/20 mt-4">
+      <div class="bg-second p-3 rounded-lg border border-white/20 mt-4">
         <div class="flex justify-between text-sm">
           <span>Service Charge:</span>
           <span>RM{(paymentInformation.serviceCharge || 0).toFixed(2)}</span>
@@ -196,7 +195,7 @@
   </div>
 
   <!-- Fixed Footer -->
-  <div class="flex-none p-4 mt-0 bg-gradient-to-t from-black to-transparent">
+  <div class="flex-none p-4 mt-0 mb-5 bg-gradient-to-t from-second to-transparent">
     <button 
       class="w-full py-2 bg-blue-500 rounded-lg transition-all duration-200 hover:bg-blue-600 hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-blue-500/25"
       use:ripple 
