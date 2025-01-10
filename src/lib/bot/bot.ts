@@ -42,6 +42,9 @@ function getBot() {
 // Initialize Gemini processor
 const geminiProcessor = new GeminiImageProcessor();
 
+// Add at the top with other state variables
+const awaitingReceipt = new Set<number>();
+
 export const setWebhook = async () => {
   const webhookUrl = `${getBaseHost()}/bot`;
   console.log("Setting webhook to:", webhookUrl);
@@ -307,7 +310,50 @@ bot.onText(/\/split/, async (message) => {
   sendSplitExpenses(message.from, message);
 });
 
+// Add the receipt command handler
+bot.onText(/\/receipt/, async (message) => {
+  console.log("Receipt command received");
+  
+  if (!message.from?.id) {
+    console.log("No user ID found");
+    return;
+  }
+
+  if (message.chat.type === "private") {
+    console.log("Private chat detected");
+    return;
+  }
+
+  console.log(`Adding user ${message.from.id} to awaiting receipt`);
+  awaitingReceipt.add(message.from.id);
+  
+  await bot.sendMessage(
+    message.chat.id,
+    "Please send a photo of your receipt",
+    { parse_mode: "MarkdownV2" }
+  );
+});
+
 bot.on("photo", async (message) => {
+  console.log("Photo received");
+  console.log("From user:", message.from?.id);
+  console.log("Awaiting receipt users:", Array.from(awaitingReceipt));
+
+  if (!message.from?.id) {
+    console.log("No user ID in photo message");
+    return;
+  }
+
+  if (!awaitingReceipt.has(message.from.id)) {
+    console.log("User not awaiting receipt");
+    return;
+  }
+
+  console.log("Processing receipt for user");
+  awaitingReceipt.delete(message.from.id);
+
+  if (!message.photo?.length) return;
+  
   const languageCode = message.from?.language_code;
   
   console.log("1. Photo received, chat type:", message.chat.type);
