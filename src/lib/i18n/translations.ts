@@ -4,7 +4,7 @@ export type Dictionary = Record<SupportedLanguage, Record<string, string>>;
 export const dictionary = {
   default: {
     "bot.menu_button": "Home",
-    "bot.group.registered": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your group split expenses\\.*\n\n*❓ How does it work?*\n\\- Each member of the group has to press "Join"\n\\- In the private chat with the bot everyone can manage all payments and expenses for all groups\n\\- Use the /split command in this group to see the splits\\.`,
+    "bot.group.registered": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your group split expenses\\.*\n\n*❓ How does it work?*\n\\- Each member of the group has to press "Join"\n\\- In the private chat with the bot everyone can manage all payments and expenses for all groups\n\\- Use /split to view all debts\n\\- Use /receipt to scan and split receipts:\n  \• Send the /receipt command\n  \• Send a photo of your receipt\n  \• Bot will process and let you split the bill`,
     "bot.group.adduser": "Join",
     "bot.error": "Oh no, an error occurred 😞",
     "bot.add_to_group": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your group split expenses\\.*\n\n*❓ How does it work?*\n\\- Add the bot to your group\n\\- Wait for all group members to join\n\\- Use the /app command to launch the webapp and manage expenses and splits\\.`,
@@ -79,5 +79,6 @@ export const dictionary = {
     "subscription.success": "✨ Thank you for subscribing to ChopChopSplit Premium! Your subscription is now active.",
     "subscription.error": "❌ Subscription failed: {{message}}",
     "subscription.command": "*🌟 ChopChopSplit Premium*\n\nUnlock all features:\n\\- Unlimited groups\n\\- Receipt scanning\n\\- Advanced analytics\n\\- Priority support\n\nChoose your plan:",
+    "bot.help_message": "*Available Commands:*\n\n📋 /split \\- View all debts in the group\n🧾 /receipt \\- Process a receipt photo\n\\- Send the command\n\\- Send the receipt photo\n\\- Bot will process and let you split the bill\n❓ /help \\- Show this help message",
   }
 } as Dictionary;

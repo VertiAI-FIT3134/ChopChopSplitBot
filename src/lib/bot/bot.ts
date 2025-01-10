@@ -57,7 +57,10 @@ export const setWebhook = async () => {
 export const bot = getBot();
 
 function sendPrivateMessage(chatId: number, languageCode: string | undefined) {
-  getBot().sendMessage(chatId, translate(languageCode, "bot.add_to_group"), {
+  const message = translate(languageCode, "bot.add_to_group") + "\n\n" + 
+                 translate(languageCode, "bot.help_message");
+  
+  getBot().sendMessage(chatId, message, {
     parse_mode: "MarkdownV2",
     reply_markup: {
       inline_keyboard: [
@@ -121,6 +124,7 @@ bot.onText(/\/start|\/setup|\/app/, async (message) => {
       message.chat.id,
       translate(languageCode, "bot.group.registered", {
         members: members.map((m: TelegramBot.User) => memberToList(m)).join("\n"),
+        commands: "Available commands:\n/split \\- View all debts\n/receipt \\- Process a receipt photo"
       }),
       {
         parse_mode: "MarkdownV2",
@@ -517,4 +521,13 @@ bot.onText(/\/trial/, async (message) => {
       }
     }
   );
+});
+
+// Add near the top with other command handlers
+bot.onText(/\/help/, async (message) => {
+  const languageCode = message.from?.language_code;
+  const chatId = message.chat.id;
+
+  const helpMessage = translate(languageCode, "bot.help_message");
+  await bot.sendMessage(chatId, helpMessage, { parse_mode: "MarkdownV2" });
 });
