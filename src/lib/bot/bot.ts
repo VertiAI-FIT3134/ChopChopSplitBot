@@ -241,8 +241,15 @@ async function registerUser(user: TelegramBot.User, message: TelegramBot.Message
     await registerUserInGroup(user, message.chat);
     const members = (await groupMembers(message.chat)) || [];
 
-    // Create a clickable group link
-    const groupLink = `[*${pmd2(message.chat.title || "the group")}*](https://t.me/c/${message.chat.id.toString().slice(4)})`;
+    // Get group invite link
+    let groupLink;
+    try {
+      const inviteLink = await bot.exportChatInviteLink(message.chat.id);
+      groupLink = `[*${pmd2(message.chat.title || "the group")}*](${inviteLink})`;
+    } catch (error) {
+      // Fallback if we can't get invite link
+      groupLink = `*${pmd2(message.chat.title || "the group")}*`;
+    }
 
     // Send feedback to the user who joined
     await bot.sendMessage(
