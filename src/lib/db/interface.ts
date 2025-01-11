@@ -596,12 +596,17 @@ export const checkPremiumAccess = async (userId: number, feature: 'scan' | 'trip
   console.log(`Checking premium access for user ${userId}, feature: ${feature}`);
   const { hasPlan, plan } = await checkUserPlan(userId);
   
+  // If user has any active plan, they should have access
   if (!hasPlan || !plan) {
     console.log('No active plan found');
     return false;
   }
 
-  const limits = await getUserPlanLimits(userId);
+  console.log('Active plan found:', plan.type);
+  return true;
+
+  // We don't need to check specific limits anymore since any active plan grants access
+  /* const limits = await getUserPlanLimits(userId);
   if (!limits) {
     console.log('Failed to get plan limits');
     return false;
@@ -621,7 +626,7 @@ export const checkPremiumAccess = async (userId: number, feature: 'scan' | 'trip
   }
 
   console.log(`Access result for ${feature}: ${hasAccess}`);
-  return hasAccess;
+  return hasAccess; */
 };
 
 // Update or set user's plan

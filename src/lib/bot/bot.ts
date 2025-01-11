@@ -226,57 +226,57 @@ bot.on("callback_query", async (callbackQuery) => {
   const user = callbackQuery.from;
   const languageCode = user.language_code;
 
-  // Allow plan management without premium
-  if (data === "plan_management") {
-    console.log("Checking plan details for user:", user.id);
-    const { hasPlan, plan } = await checkUserPlan(user.id);
-    console.log("Plan check result:", { hasPlan, plan });
-    
-    let messageText;
-    if (hasPlan && plan) {
-      const { type, started_at, expires_at } = plan;
-      const limits = await getUserPlanLimits(user.id);
-      console.log("Plan limits:", limits);
+  try {
+    // Allow these actions without premium
+    if (data === "plan_management") {
+      console.log("Checking plan details for user:", user.id);
+      const { hasPlan, plan } = await checkUserPlan(user.id);
+      console.log("Plan check result:", { hasPlan, plan });
       
-      messageText = translate(languageCode, "bot.plan_details", {
-        planType: translate(languageCode, `bot.plan_type.${type}`),
-        startDate: started_at.toLocaleDateString(),
-        expiryDate: expires_at.toLocaleDateString(),
-        remainingTravelers: String(limits?.travelersRemaining || 0),
-        remainingScans: String(limits?.scansRemaining || 0),
-        remainingDays: String(limits?.daysRemaining || 0),
-        remainingTrips: String(limits?.tripsRemaining || 0)
-      });
-    } else {
-      console.log("No active plan found");
-      messageText = translate(languageCode, "bot.no_active_plan");
-    }
-
-    await bot.sendMessage(message.chat.id, messageText, {
-      parse_mode: "MarkdownV2",
-      reply_markup: {
-        inline_keyboard: [
-          [{
-            text: translate(languageCode, "bot.upgrade_plan"),
-            url: `https://chopchopsplit.com/#pricing?user_id=${user.id}`
-          }]
-        ]
+      let messageText;
+      if (hasPlan && plan) {
+        const { type, started_at, expires_at } = plan;
+        const limits = await getUserPlanLimits(user.id);
+        console.log("Plan limits:", limits);
+        
+        messageText = translate(languageCode, "bot.plan_details", {
+          planType: translate(languageCode, `bot.plan_type.${type}`),
+          startDate: started_at.toLocaleDateString(),
+          expiryDate: expires_at.toLocaleDateString(),
+          remainingTravelers: String(limits?.travelersRemaining || 0),
+          remainingScans: String(limits?.scansRemaining || 0),
+          remainingDays: String(limits?.daysRemaining || 0),
+          remainingTrips: String(limits?.tripsRemaining || 0)
+        });
+      } else {
+        console.log("No active plan found");
+        messageText = translate(languageCode, "bot.no_active_plan");
       }
-    });
-  } else {
-    // Require premium for all other callbacks
-    if (!await checkPremiumAndNotify(user.id, message.chat.id, languageCode)) {
-      await bot.answerCallbackQuery(callbackQuery.id);
-      return;
-    }
 
-    try {
-      if (data === "adduser") {
-        registerUser(user, message);
-      } else if (data === "openbot") {
-        sendPrivateMessage(user.id, user.language_code);
+      await bot.sendMessage(message.chat.id, messageText, {
+        parse_mode: "MarkdownV2",
+        reply_markup: {
+          inline_keyboard: [
+            [{
+              text: translate(languageCode, "bot.upgrade_plan"),
+              url: `https://chopchopsplit.com/#pricing?user_id=${user.id}`
+            }]
+          ]
+        }
+      });
+    } else if (data === "adduser") {
+      await registerUser(user, message);
+    } else {
+      // Require premium for all other actions
+      if (!await checkPremiumAndNotify(user.id, message.chat.id, languageCode)) {
+        await bot.answerCallbackQuery(callbackQuery.id);
+        return;
+      }
+
+      if (data === "openbot") {
+        await sendPrivateMessage(user.id, user.language_code);
       } else if (data === "split") {
-        sendSplitExpenses(user, message);
+        await sendSplitExpenses(user, message);
       } else if (data === "receipt") {
         // Handle receipt button click
         console.log(`Adding user ${user.id} to awaiting receipt`);
@@ -287,20 +287,17 @@ bot.on("callback_query", async (callbackQuery) => {
           translate(languageCode, "bot.send_receipt_photo"),
           { parse_mode: "MarkdownV2" }
         );
-        
-        // Answer the callback query
-        await bot.answerCallbackQuery(callbackQuery.id);
       } else if (data?.startsWith('split_receipt:')) {
-        console.log("Processing split receipt callback");
-        const messageText = message.text;
-        console.log("Message text:", messageText);
-        
-        if (!messageText) {
-          console.log("No message text found");
-          return;
-        }
-
         try {
+          console.log("Processing split receipt callback");
+          const messageText = message.text;
+          console.log("Message text:", messageText);
+          
+          if (!messageText) {
+            console.log("No message text found");
+            return;
+          }
+
           // Parse total amount from the message
           const totalMatch = messageText.match(/Total: ([\d.]+)/);
           if (!totalMatch) throw new Error("Could not find total amount");
@@ -366,20 +363,18 @@ bot.on("callback_query", async (callbackQuery) => {
               }
             }
           );
-
-          // Answer the callback query
-          await bot.answerCallbackQuery(callbackQuery.id);
         } catch (error) {
           console.error("Error processing split receipt:", error);
           sendError(message.chat.id, languageCode, error);
           await bot.answerCallbackQuery(callbackQuery.id, { text: "Error processing receipt" });
+          return;
         }
       }
-      await bot.answerCallbackQuery(callbackQuery.id);
-    } catch (error) {
-      console.error("Error handling callback query:", error);
-      sendError(message.chat.id, languageCode, error);
     }
+    await bot.answerCallbackQuery(callbackQuery.id);
+  } catch (error) {
+    console.error("Error handling callback query:", error);
+    sendError(message.chat.id, languageCode, error);
   }
 });
 
@@ -387,28 +382,6 @@ async function registerUser(user: TelegramBot.User, message: TelegramBot.Message
   const languageCode = user.language_code;
 
   try {
-    // Check premium access for adding travelers
-    const hasAccess = await checkPremiumAccess(user.id, 'travelers');
-    if (!hasAccess) {
-      console.log("User doesn't have premium access for adding travelers");
-      await bot.sendMessage(
-        message.chat.id,
-        translate(languageCode, "bot.premium_required"),
-        {
-          parse_mode: "MarkdownV2",
-          reply_markup: {
-            inline_keyboard: [
-              [{
-                text: translate(languageCode, "bot.get_premium"),
-                url: `https://chopchopsplit.com/#pricing?user_id=${user.id}`
-              }]
-            ]
-          }
-        }
-      );
-      return;
-    }
-
     await registerUserInGroup(user, message.chat);
     const members = (await groupMembers(message.chat)) || [];
 
@@ -420,18 +393,6 @@ async function registerUser(user: TelegramBot.User, message: TelegramBot.Message
     } catch (error) {
       // Fallback if we can't get invite link
       groupLink = `*${pmd2(message.chat.title || "the group")}*`;
-    }
-
-    // Update usage stats for travelers
-    await updateUsageStats(user.id, { travelers: 1 });
-
-    // Check for plan expiration and send reminder if needed
-    const { plan } = await checkUserPlan(user.id);
-    if (plan) {
-      const hoursUntilExpiry = Math.ceil((plan.expires_at.getTime() - new Date().getTime()) / (1000 * 60 * 60));
-      if (hoursUntilExpiry <= 24 && hoursUntilExpiry > 0) {
-        await sendExpirationMessage(bot, user.id, translate(languageCode, `bot.plan_type.${plan.type}`));
-      }
     }
 
     // Send feedback to the user who joined
@@ -455,6 +416,22 @@ async function registerUser(user: TelegramBot.User, message: TelegramBot.Message
         reply_markup: ADD_USER_KEYBOARD(languageCode),
       }
     );
+
+    // If user has a premium plan, update their usage stats
+    const { hasPlan } = await checkUserPlan(user.id);
+    if (hasPlan) {
+      // Update usage stats for travelers
+      await updateUsageStats(user.id, { travelers: 1 });
+
+      // Check for plan expiration and send reminder if needed
+      const { plan } = await checkUserPlan(user.id);
+      if (plan) {
+        const hoursUntilExpiry = Math.ceil((plan.expires_at.getTime() - new Date().getTime()) / (1000 * 60 * 60));
+        if (hoursUntilExpiry <= 24 && hoursUntilExpiry > 0) {
+          await sendExpirationMessage(bot, user.id, translate(languageCode, `bot.plan_type.${plan.type}`));
+        }
+      }
+    }
   } catch (error) {
     sendError(message.chat.id, languageCode, error);
   }
