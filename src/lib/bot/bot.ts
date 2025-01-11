@@ -575,8 +575,6 @@ bot.on("photo", async (message) => {
   }
 
   console.log("Processing receipt for user");
-  state.awaitingReceipt.delete(message.from.id);
-
   if (!message.photo?.length) return;
   
   const languageCode = message.from?.language_code;
