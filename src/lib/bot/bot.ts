@@ -18,6 +18,7 @@ import {
 import { formatUser, memberToList, pmd2 } from "./utils";
 import { GeminiImageProcessor } from "../../../services/gemini-processor";
 import { downloadTelegramFile } from "../utils/telegram-utils";
+import fetch from "node-fetch";
 
 // Lazy loaded instances
 let botInstance: TelegramBot | null = null;
@@ -48,6 +49,7 @@ function getBaseHost() {
 function getBot() {
   if (!botInstance) {
     botInstance = new TelegramBot(getBotToken());
+    initializePing();
   }
   return botInstance;
 }
@@ -852,4 +854,22 @@ async function sendPlanDetails(chatId: number, languageCode: string | undefined)
     console.error("Error in sendPlanDetails:", error);
     sendError(chatId, languageCode, error);
   }
+}
+
+// Add ping function
+async function pingServer() {
+  try {
+    const response = await fetch(getBaseHost());
+    console.log("Server ping status:", response.status);
+  } catch (error) {
+    console.error("Ping failed:", error);
+  }
+}
+
+// Add self-ping initialization
+function initializePing() {
+  // Ping every 14 minutes (840000 ms)
+  // We use 14 minutes to be safe before Render's 15-minute timeout
+  setInterval(pingServer, 840000);
+  console.log("Self-ping initialized");
 }
