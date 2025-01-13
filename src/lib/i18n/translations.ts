@@ -4,7 +4,7 @@ export type Dictionary = Record<SupportedLanguage, Record<string, string>>;
 export const dictionary = {
   default: {
     "bot.menu_button": "Home",
-    "bot.group.registered": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your friends split expenses\\.*\n\n*❓ How does it work?*\n\\- Each friend has to press "Join"\n\\- In the private chat with the bot everyone can manage all payments and expenses for all groups\n\\- Use /chop to view all debts\n\\- Use /receipt to scan and split receipts:\n  \• Send the /receipt command\n  \• Send a photo of your receipt\n  \• Bot will process and let you chop chop the bill`,
+    "bot.group.registered": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your friends split expenses\\.*\n\n*❓ How does it work?*\n\\- Each friend has to press "Join"\n\\- In the private chat with the bot everyone can manage all payments and expenses for all groups\n\\- Use /chop to view all debts\n\\- Use /receipt to scan and split receipts`,
     "bot.group.adduser": "Join",
     "bot.error": "Oh no, an error occurred 😞",
     "bot.add_to_group": `*🪙 Hi, I'm ChopChop, the Telegram bot that helps your friends split expenses\\.*\n\n*❓ How does it work?*\n\\- Add the bot to your group\n\\- Wait for all friends to join\n\\- Use the /app command to launch the webapp and manage expenses\\.`,
@@ -99,5 +99,8 @@ export const dictionary = {
     "bot.premium_required": "*⭐️ Premium Feature*\n\nThis feature requires an active premium plan\\. Click below to get started\\!",
     "bot.plan_upgraded": "*✨ Plan Upgraded*\n\nYour plan has been upgraded to {{planType}}\\!\n\nNew plan will start: {{startDate}}\nExpires: {{expiryDate}}",
     "bot.get_premium": "⭐️ Get Premium",
+    "bot.group.needs_admin": "*🔑 Please make me an admin first\\!*\n\nI need admin permissions to:\n\\• Delete messages\n\\• Ban users\n\\• Invite users\n\\• Pin messages\n\nClick the button below to add me with admin permissions\\.\nAfter that, use /start to continue setup\\!",
+    "bot.group.make_admin": "🔑 Add Bot with Admin Rights",
+    "bot.admin_error": "❌ Failed to make me an admin\\. Please try manually:\n\n1\\. Open group settings\n2\\. Tap \"Administrators\"\n3\\. Add \"ChopChop\" as admin\n4\\. Enable required permissions\n5\\. Use /start when done",
   }
 } as Dictionary;

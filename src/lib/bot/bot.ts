@@ -203,15 +203,29 @@ bot.onText(/\/start|\/setup|\/app/, async (message) => {
     await registerGroup(message.chat);
     const members = (await groupMembers(message.chat)) || [];
 
+    // Check if bot is admin
+    const botUser = await bot.getMe();
+    const botMember = await bot.getChatMember(message.chat.id, botUser.id);
+    const isAdmin = botMember.status === 'administrator';
+
+    const messageText = isAdmin 
+      ? translate(languageCode, "bot.group.registered")
+      : translate(languageCode, "bot.group.needs_admin");
+
     return bot.sendMessage(
       message.chat.id,
-      translate(languageCode, "bot.group.registered", {
-        members: members.map((m: TelegramBot.User) => memberToList(m)).join("\n"),
-        commands: "Available commands:\n/split \\- View all debts\n/receipt \\- Process a receipt photo"
-      }),
+      messageText,
       {
         parse_mode: "MarkdownV2",
-        reply_markup: ADD_USER_KEYBOARD(languageCode),
+        reply_markup: {
+          inline_keyboard: [
+            [{ 
+              text: translate(languageCode, isAdmin ? "bot.group.adduser" : "bot.group.make_admin"),
+              url: isAdmin ? undefined : "https://t.me/ChopChopSplitBot?startgroup=admin",
+              callback_data: isAdmin ? "adduser" : undefined
+            }]
+          ]
+        }
       }
     );
   } catch (error) {
