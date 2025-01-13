@@ -99,8 +99,8 @@ export const dictionary = {
     "bot.premium_required": "*⭐️ Premium Feature*\n\nThis feature requires an active premium plan\\. Click below to get started\\!",
     "bot.plan_upgraded": "*✨ Plan Upgraded*\n\nYour plan has been upgraded to {{planType}}\\!\n\nNew plan will start: {{startDate}}\nExpires: {{expiryDate}}",
     "bot.get_premium": "⭐️ Get Premium",
-    "bot.group.needs_admin": "*🔑 Please make me an admin first\\!*\n\nI need admin permissions to:\n\\• Delete messages\n\\• Ban users\n\\• Invite users\n\\• Pin messages\n\nClick the button below to add me with admin permissions\\.\nAfter that, use /start to continue setup\\!",
+    "bot.group.needs_admin": "*🔑 Please make me an admin first\\!*\n\nClick the button below to add me with admin permissions\\.\nAfter that, use /start to continue setup\\!",
     "bot.group.make_admin": "🔑 Add Bot with Admin Rights",
-    "bot.admin_error": "❌ Failed to make me an admin\\. Please try manually:\n\n1\\. Open group settings\n2\\. Tap \"Administrators\"\n3\\. Add \"ChopChop\" as admin\n4\\. Enable required permissions\n5\\. Use /start when done",
+    "bot.admin_error": "❌ Failed to make me an admin\\. Please try manually:\n\n1\\. Open group settings\n2\\. Tap \"Administrators\"\n3\\. Add \"ChopChop\" as admin\n4\\. Use /start when done",
   }
 } as Dictionary;
