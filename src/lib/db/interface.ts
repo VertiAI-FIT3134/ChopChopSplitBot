@@ -709,3 +709,31 @@ export const sendExpirationMessage = async (bot: any, userId: number, planType: 
     }
   });
 };
+
+// Add new interface for receipt scans
+export interface ReceiptScan {
+  userId: number;
+  groupId: number;
+  date: Date;
+  success: boolean;
+  items?: ReceiptItem[];
+  summary?: {
+    subtotal: number;
+    total: number;
+    serviceCharge?: number;
+    serviceTax?: number;
+  };
+  metadata?: {
+    storeName: string;
+    date: string;
+  };
+}
+
+// Add new function to save receipt scans
+export const saveReceiptScan = async (scan: ReceiptScan) => {
+  await db.collection("receipt_scans").createIndex("date");
+  await db.collection("receipt_scans").createIndex("userId");
+  await db.collection("receipt_scans").createIndex("groupId");
+  
+  return await db.collection("receipt_scans").insertOne(scan);
+};

@@ -13,7 +13,8 @@ import {
   PlanType,
   checkPremiumAccess,
   updateUsageStats,
-  sendExpirationMessage
+  sendExpirationMessage,
+  saveReceiptScan
 } from "../db/interface";
 import { formatUser, memberToList, pmd2 } from "./utils";
 import { GeminiImageProcessor } from "../../../services/gemini-processor";
@@ -737,7 +738,35 @@ Date: ${escapeMarkdown(result.parsedData.metadata.date)}`;
         await sendExpirationMessage(bot, message.from.id, translate(languageCode, `bot.plan_type.${plan.type}`));
       }
     }
+
+    // Save the receipt scan
+    await saveReceiptScan({
+      userId: message.from.id,
+      groupId: message.chat.id,
+      date: new Date(),
+      success: true,
+      items: processedItems,
+      summary: {
+        subtotal: Number(receiptSummary.subtotal),
+        total: Number(receiptSummary.total),
+        serviceCharge,
+        serviceTax
+      },
+      metadata: {
+        storeName: result.parsedData.metadata.storeName,
+        date: result.parsedData.metadata.date
+      }
+    });
+
   } catch (error) {
+    // Save failed scan
+    await saveReceiptScan({
+      userId: message.from.id,
+      groupId: message.chat.id,
+      date: new Date(),
+      success: false
+    });
+    
     console.error("Error processing receipt:", error);
     sendError(message.chat.id, languageCode, error);
   }
