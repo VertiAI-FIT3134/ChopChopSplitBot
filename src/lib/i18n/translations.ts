@@ -79,11 +79,11 @@ export const dictionary = {
     "subscription.success": "✨ Thank you for subscribing to ChopChopSplit Premium! Your subscription is now active.",
     "subscription.error": "❌ Subscription failed: {{message}}",
     "subscription.command": "*🌟 ChopChopSplit Premium*\n\nUnlock all features:\n\\- Unlimited groups\n\\- Receipt scanning\n\\- Advanced analytics\n\\- Priority support\n\nChoose your plan:",
-    "bot.help_message": "*Available Commands:*\n\n📋 /chop \\- View all debts in the group\n🧾 /receipt \\- Process a receipt photo\n\\- Send the command\n\\- Send the receipt photo\n\\- Bot will process and let you chop chop the bill\n❓ /help \\- Show this help message",
+    "bot.help_message": "*Available Commands:*\n\n📋 /chop \\- View all debts in the group\n🧾 /receipt \\- Process a receipt photo\n\\- Send the command\n\\- Send the receipt photo\n\\- Bot will process and let you chop chop the bill\n🎁 /share \\- Share your premium access with friends\n❓ /help \\- Show this help message",
     "bot.add_receipt": "📸 Add receipt",
     "bot.send_receipt_photo": "Please send a photo of your receipt\\.",
     "bot.plan_management": "⭐️ Plan management",
-    "bot.plan_details": "Your current plan: *{{planType}}*\n\nStarted: {{startDate}}\nExpires: {{expiryDate}}\n\nRemaining limits:\n\\- Travelers: {{remainingTravelers}}\n\\- Receipt scans: {{remainingScans}}\n\\- Days: {{remainingDays}}\n\\- Trips: {{remainingTrips}}",
+    "bot.plan_details": "Your current plan: *{{planType}}*\n\nStarted: {{startDate}}\nExpires: {{endDate}}\n\nRemaining limits:\n\\- Travelers: {{travelers}}\n\\- Receipt scans: {{scans}}\n\\- Days: {{days}}\n\\- Trips: {{trips}}",
     "bot.no_active_plan": "You don't have an active plan\\. Click the button below to upgrade and unlock premium features\\!",
     "bot.upgrade_plan": "⭐️ Upgrade plan",
     "bot.plan_type.weekend": "Weekend Plan",
@@ -102,5 +102,9 @@ export const dictionary = {
     "bot.group.needs_admin": "*🔑 Please make me an admin first\\!*\n\nClick the button below to add me with admin permissions\\.\nAfter that, use /start to continue setup\\!",
     "bot.group.make_admin": "🔑 Add Bot with Admin Rights",
     "bot.admin_error": "❌ Failed to make me an admin\\. Please try manually:\n\n1\\. Open group settings\n2\\. Tap \"Administrators\"\n3\\. Add \"ChopChop\" as admin\n4\\. Use /start when done",
+    "bot.select_members_to_share": "*Share Your Premium Access*\n\nSelect friends to share your premium access with\\. They will be able to use all premium features\\!",
+    "bot.no_members_to_share": "No friends available to share with\\. Everyone either already has access or you're the only one in the group\\!",
+    "bot.plan_shared_success": "✨ Successfully shared premium access with {{user}}\\!",
+    "bot.plan_shared_error": "❌ Failed to share premium access\\. Please try again\\.",
   }
 } as Dictionary;

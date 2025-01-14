@@ -13,7 +13,8 @@ import {
   PlanType,
   checkPremiumAccess,
   updateUsageStats,
-  sendExpirationMessage
+  sendExpirationMessage,
+  addChildrenToPlan
 } from "../db/interface";
 import { formatUser, memberToList, pmd2 } from "./utils";
 import { GeminiImageProcessor } from "../../../services/gemini-processor";
@@ -237,153 +238,99 @@ bot.onText(/\/start|\/setup|\/app/, async (message) => {
 bot.on("callback_query", async (callbackQuery) => {
   const message = callbackQuery.message;
   if (!message) return;
-
+  
+  const languageCode = callbackQuery.from.language_code;
   const data = callbackQuery.data;
-  const user = callbackQuery.from;
-  const languageCode = user.language_code;
 
   try {
-    // Allow these actions without premium
-    if (data === "plan_management") {
-      console.log("Checking plan details for user:", user.id);
-      const { hasPlan, plan } = await checkUserPlan(user.id);
-      console.log("Plan check result:", { hasPlan, plan });
-      
-      let messageText;
-      if (hasPlan && plan) {
-        const { type, started_at, expires_at } = plan;
-        const limits = await getUserPlanLimits(user.id);
-        console.log("Plan limits:", limits);
+    if (data) {
+      if (data === 'plan_management') {
+        console.log("Checking plan details for user:", callbackQuery.from.id);
+        const { hasPlan, plan } = await checkUserPlan(callbackQuery.from.id);
         
-        messageText = translate(languageCode, "bot.plan_details", {
-          planType: translate(languageCode, `bot.plan_type.${type}`),
-          startDate: started_at.toLocaleDateString(),
-          expiryDate: expires_at.toLocaleDateString(),
-          remainingTravelers: String(limits?.travelersRemaining || 0),
-          remainingScans: String(limits?.scansRemaining || 0),
-          remainingDays: String(limits?.daysRemaining || 0),
-          remainingTrips: String(limits?.tripsRemaining || 0)
-        });
-      } else {
-        console.log("No active plan found");
-        messageText = translate(languageCode, "bot.no_active_plan");
-      }
-
-      await bot.sendMessage(message.chat.id, messageText, {
-        parse_mode: "MarkdownV2",
-        reply_markup: {
-          inline_keyboard: [
-            [{
-              text: translate(languageCode, "bot.upgrade_plan"),
-              url: `https://chopchopsplit.com/#pricing?user_id=${user.id}`
-            }]
-          ]
-        }
-      });
-    } else if (data === "adduser") {
-      await registerUser(user, message);
-    } else {
-      // Require premium for all other actions
-      if (!await checkPremiumAndNotify(user.id, message.chat.id, languageCode)) {
-        await bot.answerCallbackQuery(callbackQuery.id);
-        return;
-      }
-
-      if (data === "openbot") {
-        await sendPrivateMessage(user.id, user.language_code);
-      } else if (data === "split") {
-        await sendSplitExpenses(user, message);
-      } else if (data === "receipt") {
-        // Handle receipt button click
-        console.log(`Adding user ${user.id} to awaiting receipt`);
-        state.awaitingReceipt.add(user.id);
-        
-        await bot.sendMessage(
-          message.chat.id,
-          translate(languageCode, "bot.send_receipt_photo"),
-          { parse_mode: "MarkdownV2" }
-        );
-      } else if (data?.startsWith('split_receipt:')) {
-        try {
-          console.log("Processing split receipt callback");
-          const messageText = message.text;
-          console.log("Message text:", messageText);
-          
-          if (!messageText) {
-            console.log("No message text found");
-            return;
-          }
-
-          // Parse total amount from the message
-          const totalMatch = messageText.match(/Total: ([\d.]+)/);
-          if (!totalMatch) throw new Error("Could not find total amount");
-          
-          const amount = parseFloat(totalMatch[1]);
-          
-          // Get store name and date
-          const storeMatch = messageText.match(/Store: (.+)\n/);
-          const dateMatch = messageText.match(/Date: (.+)/);
-          
-          const description = `Receipt from ${storeMatch?.[1] || 'store'} on ${dateMatch?.[1] || 'unknown date'}`;
-
-          // Parse items from the message text
-          const items = messageText
-            .split('\n')
-            .filter(line => line.includes(': ') && line.includes(' = '))
-            .map(line => {
-              const [name, details] = line.split(': ');
-              const [quantity, unitPrice, , totalPrice] = details.split(' ').map(n => parseFloat(n) || 0);
-              return {
-                name,
-                quantity,
-                unitPrice,
-                totalPrice,
-                assignedTo: []
-              };
-            });
-
-          console.log("Message Text:", messageText);
-
-          // Update regex patterns to match the exact format
-          const serviceChargeMatch = messageText.match(/Service Charge: ([\d.]+)/);
-          const serviceTaxMatch = messageText.match(/Service Tax: ([\d.]+)/);
-
-          console.log("Service Charge Match:", serviceChargeMatch);
-          console.log("Service Tax Match:", serviceTaxMatch);
-
-          const serviceCharge = parseFloat(serviceChargeMatch?.[1] || '0');
-          const serviceTax = parseFloat(serviceTaxMatch?.[1] || '0');
-
-          // Add this to parse taxesIncluded from message
-          const total = parseFloat(totalMatch[1]);
-          const subtotalMatch = messageText.match(/Subtotal: ([\d.]+)/);
-          const subtotal = parseFloat(subtotalMatch?.[1] || '0');
-          const taxesIncluded = Math.abs(total - subtotal) < 0.01;
-
-          // Create URL with processed items and tax information
-          const webAppUrl = `${getBaseHost()}/webapp/add-split?amount=${amount}&description=${encodeURIComponent(description)}&receiptItems=${encodeURIComponent(JSON.stringify(items))}&serviceCharge=${serviceCharge}&serviceTax=${serviceTax}&taxesIncluded=${taxesIncluded}`;
-
-          console.log("Web app URL:", webAppUrl);
-
-          // Send web app button in private chat
+        if (!hasPlan || !plan) {
           await bot.sendMessage(
-            user.id,
-            `Receipt Details\\:\nAmount: RM${pmd2(amount.toFixed(2))} \n${pmd2(description)}`,
+            message.chat.id,
+            translate(languageCode, "bot.no_active_plan"),
             {
               parse_mode: "MarkdownV2",
               reply_markup: {
                 inline_keyboard: [[{
-                  text: translate(languageCode, "bot.add_split"),
-                  web_app: { url: webAppUrl }
+                  text: translate(languageCode, "bot.get_premium"),
+                  url: `https://chopchopsplit.com/#pricing?user_id=${callbackQuery.from.id}`
                 }]]
               }
             }
           );
-        } catch (error) {
-          console.error("Error processing split receipt:", error);
-          sendError(message.chat.id, languageCode, error);
-          await bot.answerCallbackQuery(callbackQuery.id, { text: "Error processing receipt" });
           return;
+        }
+
+        console.log("Getting plan limits for user:", callbackQuery.from.id);
+        const limits = await getUserPlanLimits(callbackQuery.from.id);
+        
+        // Helper function to escape special characters for MarkdownV2
+        const escapeMarkdown = (text: string) => {
+          return text
+            // Escape all special characters except asterisks used for bold
+            .replace(/([_[\]()~`>#+=|{}.!-])/g, '\\$1');
+        };
+
+        // Format dates
+        const startDate = plan.started_at.toLocaleDateString();
+        const endDate = plan.expires_at.toLocaleDateString();
+        const planType = plan.type.charAt(0).toUpperCase() + plan.type.slice(1);
+        
+        // Create message with actual values instead of templates
+        const planMessage = [
+          `Your current plan: *${planType} Plan*`,
+          "",
+          `Started: ${startDate}`,
+          `Expires: ${endDate}`,
+          "",
+          "Remaining limits:",
+          `- Travelers: ${Math.max(0, limits?.travelersRemaining || 0)}`,
+          `- Receipt scans: ${Math.max(0, limits?.scansRemaining || 0)}`,
+          `- Days: ${Math.max(0, limits?.daysRemaining || 0)}`,
+          `- Trips: ${Math.max(0, limits?.tripsRemaining || 0)}`
+        ].join("\n");
+
+        await bot.sendMessage(
+          message.chat.id,
+          escapeMarkdown(planMessage),
+          {
+            parse_mode: "MarkdownV2",
+            reply_markup: {
+              inline_keyboard: [[{
+                text: translate(languageCode, "bot.get_premium"),
+                url: `https://chopchopsplit.com/#pricing?user_id=${callbackQuery.from.id}`
+              }]]
+            }
+          }
+        );
+      } else if (data.startsWith('share_plan:')) {
+        const childId = parseInt(data.split(':')[1]);
+        const parentId = callbackQuery.from.id;
+        
+        try {
+          const success = await addChildrenToPlan(parentId, [childId]);
+          if (success) {
+            await bot.sendMessage(
+              message.chat.id,
+              translate(languageCode, "bot.plan_shared_success", {
+                user: (await bot.getChatMember(message.chat.id, childId)).user.first_name
+              }),
+              { parse_mode: "MarkdownV2" }
+            );
+          } else {
+            await bot.sendMessage(
+              message.chat.id,
+              translate(languageCode, "bot.plan_shared_error"),
+              { parse_mode: "MarkdownV2" }
+            );
+          }
+        } catch (error) {
+          console.error("Error sharing plan:", error);
+          sendError(message.chat.id, languageCode, error);
         }
       }
     }
@@ -887,3 +834,64 @@ function initializePing() {
   setInterval(pingServer, 840000);
   console.log("Self-ping initialized");
 }
+
+// Add new command handlers for managing plan access
+bot.onText(/\/share/, async (message) => {
+  const userId = message.from?.id;
+  const languageCode = message.from?.language_code;
+  
+  if (!userId) return;
+
+  // Check if user has their own plan (not a child plan)
+  const { hasPlan, plan, isChild } = await checkUserPlan(userId);
+  if (!hasPlan || !plan || isChild) {
+    await bot.sendMessage(
+      message.chat.id,
+      translate(languageCode, "bot.premium_required"),
+      {
+        parse_mode: "MarkdownV2",
+        reply_markup: {
+          inline_keyboard: [
+            [{
+              text: translate(languageCode, "bot.get_premium"),
+              url: `https://chopchopsplit.com/#pricing?user_id=${userId}`
+            }]
+          ]
+        }
+      }
+    );
+    return;
+  }
+
+  // Get group members
+  const group = await getGroupById(message.chat.id);
+  if (!group) return;
+
+  // Create keyboard with all group members except the plan owner
+  const keyboard = group.members
+    .filter(member => member.id !== userId && !plan.children?.includes(member.id))
+    .map(member => [{
+      text: `${member.first_name} ${member.last_name || ''}`,
+      callback_data: `share_plan:${member.id}`
+    }]);
+
+  if (keyboard.length === 0) {
+    await bot.sendMessage(
+      message.chat.id,
+      translate(languageCode, "bot.no_members_to_share"),
+      { parse_mode: "MarkdownV2" }
+    );
+    return;
+  }
+
+  await bot.sendMessage(
+    message.chat.id,
+    translate(languageCode, "bot.select_members_to_share"),
+    {
+      parse_mode: "MarkdownV2",
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    }
+  );
+});

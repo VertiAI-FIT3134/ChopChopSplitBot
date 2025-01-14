@@ -6,6 +6,7 @@ import { translate } from "../i18n/i18n";
 interface CachedPlan {
   hasPlan: boolean;
   plan?: Plan;
+  isChild?: boolean;
   cachedAt: number;
 }
 
@@ -458,6 +459,9 @@ export interface Plan {
   type: PlanType;
   started_at: Date;
   expires_at: Date;
+  parent_id?: number;  // If set, this user is a child of another premium user
+  children?: number[]; // List of user IDs that this premium user has granted access to
+  group_id: number;    // The group this plan is associated with
 }
 
 // Plan limits
@@ -465,73 +469,154 @@ export const PLAN_LIMITS = {
   weekend: {
     maxTravelers: 4,
     maxScans: 50,
-    maxDays: 3,
+    maxDays: 7,
     maxTrips: 1
   },
   vacation: {
     maxTravelers: 8,
     maxScans: 200,
-    maxDays: 7,
+    maxDays: 14,
     maxTrips: 2
   },
   extended: {
     maxTravelers: 15,
     maxScans: Infinity,
-    maxDays: 14,
+    maxDays: 30,
     maxTrips: 5
   }
 } as const;
 
 // Check user's plan status with caching
-export const checkUserPlan = async (userId: number): Promise<{ hasPlan: boolean; plan?: Plan }> => {
+export const checkUserPlan = async (userId: number): Promise<{ hasPlan: boolean; plan?: Plan; isChild?: boolean }> => {
   const now = new Date();
   const cached = planCache.get(userId);
 
   // Check if we have a valid cached result
   if (cached && (now.getTime() - cached.cachedAt) < CACHE_TTL) {
     console.log("Using cached plan data for user:", userId);
-    return { hasPlan: cached.hasPlan, plan: cached.plan };
+    return { hasPlan: cached.hasPlan, plan: cached.plan, isChild: cached.isChild };
   }
 
   console.log("Checking plan in database for user:", userId);
   
-  // Query database for fresh data
+  // First check if user has their own plan
   const user = await db.collection("users").findOne({
     id: userId,
     'plan.expires_at': { $gt: now }
   });
-  
-  console.log("User data from MongoDB:", JSON.stringify(user, null, 2));
-  
-  let result: { hasPlan: boolean; plan?: Plan };
-  
-  if (!user?.plan) {
-    console.log("No active plan found for user");
-    result = { hasPlan: false };
-  } else {
-    // Parse the plan data
-    const plan = {
-      type: user.plan.type as PlanType,
-      started_at: new Date(user.plan.started_at),
-      expires_at: new Date(user.plan.expires_at)
-    };
 
-    console.log("Active plan found:", {
-      type: plan.type,
-      started_at: plan.started_at.toISOString(),
-      expires_at: plan.expires_at.toISOString()
+  // If no direct plan, check if user is a child of a premium user
+  if (!user?.plan) {
+    const parentUser = await db.collection("users").findOne({
+      'plan.children': userId,
+      'plan.expires_at': { $gt: now }
     });
-    
-    result = { hasPlan: true, plan };
+
+    if (parentUser?.plan) {
+      console.log("Found parent plan:", parentUser.id);
+      const result = { 
+        hasPlan: true, 
+        plan: parentUser.plan,
+        isChild: true 
+      };
+      planCache.set(userId, {
+        ...result,
+        cachedAt: now.getTime()
+      });
+      return result;
+    }
+
+    console.log("No active plan found for user");
+    const result = { hasPlan: false };
+    planCache.set(userId, {
+      ...result,
+      cachedAt: now.getTime()
+    });
+    return result;
   }
 
-  // Cache the result
+  // User has their own plan
+  const plan = {
+    type: user.plan.type as PlanType,
+    started_at: new Date(user.plan.started_at),
+    expires_at: new Date(user.plan.expires_at),
+    children: user.plan.children || [],
+    group_id: user.plan.group_id
+  };
+
+  console.log("Active plan found:", {
+    type: plan.type,
+    started_at: plan.started_at.toISOString(),
+    expires_at: plan.expires_at.toISOString(),
+    children: plan.children
+  });
+  
+  const result = { hasPlan: true, plan, isChild: false };
   planCache.set(userId, {
     ...result,
     cachedAt: now.getTime()
   });
 
   return result;
+};
+
+// Add child users to a parent's plan
+export const addChildrenToPlan = async (parentId: number, childIds: number[]): Promise<boolean> => {
+  try {
+    const { hasPlan, plan } = await checkUserPlan(parentId);
+    if (!hasPlan || !plan) {
+      console.log("Parent user doesn't have an active plan");
+      return false;
+    }
+
+    // Add children to the plan
+    const result = await db.collection("users").updateOne(
+      { id: parentId },
+      { 
+        $addToSet: { 
+          'plan.children': { $each: childIds }
+        }
+      }
+    );
+
+    if (result.modifiedCount === 1) {
+      // Invalidate cache for parent and all children
+      invalidatePlanCache(parentId);
+      childIds.forEach(childId => invalidatePlanCache(childId));
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error adding children to plan:", error);
+    return false;
+  }
+};
+
+// Remove child users from a parent's plan
+export const removeChildFromPlan = async (parentId: number, childId: number): Promise<boolean> => {
+  try {
+    const result = await db.collection("users").updateOne(
+      { id: parentId },
+      { 
+        $pull: { 
+          'plan.children': childId
+        }
+      }
+    );
+
+    if (result.modifiedCount === 1) {
+      // Invalidate cache for parent and child
+      invalidatePlanCache(parentId);
+      invalidatePlanCache(childId);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Error removing child from plan:", error);
+    return false;
+  }
 };
 
 // Add function to invalidate cache when plan changes
@@ -708,4 +793,53 @@ export const sendExpirationMessage = async (bot: any, userId: number, planType: 
       ]
     }
   });
+};
+
+// Add function to update existing plan durations
+export const updateExistingPlanDurations = async () => {
+  console.log("Updating existing plan durations");
+  const now = new Date();
+  
+  try {
+    // Find all users with active plans
+    const usersWithPlans = await db.collection("users").find({
+      'plan.expires_at': { $gt: now }
+    }).toArray();
+
+    console.log(`Found ${usersWithPlans.length} active plans to update`);
+
+    for (const user of usersWithPlans) {
+      const planType = user.plan.type as PlanType;
+      const startDate = new Date(user.plan.started_at);
+      
+      // Calculate new expiry based on new durations
+      const newExpiryDate = new Date(startDate);
+      newExpiryDate.setDate(startDate.getDate() + PLAN_LIMITS[planType].maxDays);
+
+      console.log(`Updating plan for user ${user.id}:`, {
+        type: planType,
+        oldExpiry: user.plan.expires_at,
+        newExpiry: newExpiryDate
+      });
+
+      // Update the expiration date
+      await db.collection("users").updateOne(
+        { id: user.id },
+        {
+          $set: {
+            'plan.expires_at': newExpiryDate
+          }
+        }
+      );
+
+      // Invalidate cache for this user
+      invalidatePlanCache(user.id);
+    }
+
+    console.log("Successfully updated all active plan durations");
+    return { success: true, updatedCount: usersWithPlans.length };
+  } catch (error: any) {
+    console.error("Error updating plan durations:", error);
+    return { success: false, error: error?.message || 'Unknown error' };
+  }
 };
