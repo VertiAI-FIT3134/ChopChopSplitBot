@@ -17,11 +17,11 @@ export async function getAnalytics() {
     {
       $facet: {
         "manual": [
-          { $match: { receiptItems: { $exists: false } } },
+          { $match: { isManualSplit: true } },
           { $count: "count" }
         ],
         "receipt": [
-          { $match: { receiptItems: { $exists: true, $ne: [] } } },
+          { $match: { isManualSplit: false } },
           { $count: "count" }
         ],
         "total": [

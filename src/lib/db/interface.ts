@@ -149,17 +149,21 @@ export const addSplit = async (data: TransactionData) => {
     splits = users;
   }
 
+  // Add the split with explicit mode flag
   return await db.collection("splits").insertOne({
     group: data.group.id,
     date: new Date(),
     from: data.from.id,
     description: data.description,
     amount: data.amount,
+    // Explicitly set the mode based on presence of receiptItems
     mode: data.receiptItems ? "unequally" : data.mode,
     splits: splits?.filter((s) => s.selected).map((s) => ({ 
       user: s.id || s.user, 
       amount: s.amount 
     })),
+    // Add an explicit flag for manual vs receipt splits
+    isManualSplit: !data.receiptItems,
     receiptItems: data.receiptItems,
     serviceCharge: data.serviceCharge,
     serviceTax: data.serviceTax
