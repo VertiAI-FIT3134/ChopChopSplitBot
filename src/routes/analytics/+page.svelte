@@ -4,7 +4,10 @@
 
   let analytics = {
     totalReceipts: 0,
+    successfulScans: 0,
     totalSplits: 0,
+    manualSplits: 0,
+    receiptSplits: 0,
     totalGroups: 0,
     ocrAccuracy: 0,
     processedReceipts: 0
@@ -38,6 +41,9 @@
           <div>
             <h2 class="text-2xl font-bold">{analytics.totalReceipts}</h2>
             <p class="text-blue-100">Receipt Scans</p>
+            <p class="text-sm text-blue-200">
+              {analytics.successfulScans} successful ({Math.round(analytics.successfulScans/analytics.totalReceipts * 100)}%)
+            </p>
           </div>
         </div>
       </div>
@@ -49,6 +55,9 @@
           <div>
             <h2 class="text-2xl font-bold">{analytics.totalSplits}</h2>
             <p class="text-green-100">Total Splits</p>
+            <p class="text-sm text-green-200">
+              {analytics.manualSplits} manual · {analytics.receiptSplits} from receipts
+            </p>
           </div>
         </div>
       </div>

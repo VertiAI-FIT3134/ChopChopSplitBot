@@ -12,9 +12,34 @@ export async function getAnalytics() {
     .countDocuments({ success: true });
   console.log("Successful scans:", successfulScans);
 
-  // Total number of splits (all transactions)
-  const totalSplits = await db.collection("splits").countDocuments();
-  console.log("Total splits:", totalSplits);
+  // Total number of splits with detailed breakdown
+  const splitStats = await db.collection("splits").aggregate([
+    {
+      $facet: {
+        "manual": [
+          { $match: { receiptItems: { $exists: false } } },
+          { $count: "count" }
+        ],
+        "receipt": [
+          { $match: { receiptItems: { $exists: true, $ne: [] } } },
+          { $count: "count" }
+        ],
+        "total": [
+          { $count: "count" }
+        ]
+      }
+    }
+  ]).toArray();
+
+  const manualSplits = splitStats[0]?.manual[0]?.count || 0;
+  const receiptSplits = splitStats[0]?.receipt[0]?.count || 0;
+  const totalSplits = splitStats[0]?.total[0]?.count || 0;
+
+  console.log("Split statistics:", {
+    manual: manualSplits,
+    receipt: receiptSplits,
+    total: totalSplits
+  });
 
   // Number of groups
   const totalGroups = await db.collection("groups").countDocuments();
@@ -54,6 +79,8 @@ export async function getAnalytics() {
     totalReceipts,
     successfulScans,
     totalSplits,
+    manualSplits,
+    receiptSplits,
     totalGroups,
     ocrAccuracy: Math.round(ocrAccuracy * 100) / 100,
     processedReceipts: totalProcessed
