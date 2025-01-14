@@ -1,6 +1,44 @@
 import db from "./db";
 
+// Add this function to update existing records
+async function migrateExistingSplits() {
+  console.log("Starting splits migration...");
+  
+  try {
+    // Update all splits that have receiptItems to isManualSplit: false
+    const receiptResult = await db.collection("splits").updateMany(
+      { 
+        receiptItems: { $exists: true, $ne: [] },
+        isManualSplit: { $exists: false }
+      },
+      { $set: { isManualSplit: false } }
+    );
+
+    // Update all other splits to isManualSplit: true
+    const manualResult = await db.collection("splits").updateMany(
+      { 
+        $or: [
+          { receiptItems: { $exists: false } },
+          { receiptItems: [] }
+        ],
+        isManualSplit: { $exists: false }
+      },
+      { $set: { isManualSplit: true } }
+    );
+
+    console.log("Migration complete:", {
+      receiptSplits: receiptResult.modifiedCount,
+      manualSplits: manualResult.modifiedCount
+    });
+  } catch (error) {
+    console.error("Migration failed:", error);
+  }
+}
+
 export async function getAnalytics() {
+  // Run migration first
+  await migrateExistingSplits();
+
   console.log("Starting analytics collection...");
 
   // Total number of receipt scans (from receipt_scans collection)
